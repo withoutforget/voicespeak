@@ -1,0 +1,13 @@
+# выходные аудио
+*.wav
+!assets/studio_ref.wav
+*.mp3
+# python
+__pycache__/
+*.pyc
+.venv/
+# прочее
+.DS_Store
+
+# логи сборки
+build.log
