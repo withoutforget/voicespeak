@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir torch torchaudio \
 
 WORKDIR /app
 COPY speak.py /app/speak.py
+COPY bench.py /app/bench.py
 COPY assets /app/assets
 
 # ВШИВАЕМ модели в образ (F5 + вокодер vocos + RUAccent) — чтобы запуск был офлайн и быстрый

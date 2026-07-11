@@ -25,8 +25,25 @@ build() {
 
 image_exists() { docker image inspect "$IMAGE" >/dev/null 2>&1; }
 
+# детект GPU (общий)
+gpu_flags() {
+  if command -v nvidia-smi >/dev/null 2>&1 && docker info 2>/dev/null | grep -qiE 'Runtimes:.*nvidia|nvidia'; then
+    echo "--gpus all"
+  fi
+}
+
 # --- режим сборки ---
 if [[ "${1:-}" == "build" ]]; then build; exit 0; fi
+
+# --- режим бенчмарка ---
+if [[ "${1:-}" == "bench" ]]; then
+  shift
+  image_exists || build
+  read -r -a GPU <<< "$(gpu_flags)"
+  [[ ${#GPU[@]} -gt 0 ]] && c "==> GPU обнаружен — бенч на GPU." || c "==> GPU недоступен — бенч на CPU."
+  docker run --rm "${GPU[@]}" --entrypoint python "$IMAGE" bench.py "$@"
+  exit 0
+fi
 
 if [[ $# -lt 1 ]]; then
   err "Использование: ./run.sh <input.txt> [output.wav] [--nfe 16] [--speed 1.0]"
@@ -50,9 +67,8 @@ OUT_DIR="$(cd "$(dirname "$OUTPUT")" 2>/dev/null && pwd || (mkdir -p "$(dirname 
 OUT_NAME="$(basename "$OUTPUT")"
 
 # --- детект GPU ---
-GPU=()
-if command -v nvidia-smi >/dev/null 2>&1 && docker info 2>/dev/null | grep -qiE 'Runtimes:.*nvidia|nvidia'; then
-  GPU=(--gpus all)
+read -r -a GPU <<< "$(gpu_flags)"
+if [[ ${#GPU[@]} -gt 0 ]]; then
   c "==> GPU обнаружен — запускаю с ускорением."
 else
   c "==> GPU в Docker недоступен — работаю на CPU (медленнее). Для GPU нужен nvidia-container-toolkit."
