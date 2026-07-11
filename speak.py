@@ -16,6 +16,23 @@ def _patched(self, outs, feed, ro=None):
     return _run(self, outs, feed, ro)
 ort.InferenceSession.run = _patched
 
+# --- ограничиваем аппетит onnxruntime к памяти ---
+# Docker на Apple Silicon (и вообще на CPU) крутит контейнер в VM с лимитом RAM.
+# По умолчанию onnxruntime резервирует крупный memory-arena и, если аллокация в VM
+# не проходит, падает с ResourceExhausted на шаге RUAccent. Отключаем арену и лишние
+# потоки, чтобы сессии брали память по факту, а не заранее большим блоком.
+_init = ort.InferenceSession.__init__
+def _patched_init(self, *a, **kw):
+    if kw.get("sess_options") is None and (len(a) < 2 or a[1] is None):
+        so = ort.SessionOptions()
+        so.enable_cpu_mem_arena = False
+        so.enable_mem_pattern = False
+        so.intra_op_num_threads = 1
+        so.inter_op_num_threads = 1
+        kw["sess_options"] = so
+    return _init(self, *a, **kw)
+ort.InferenceSession.__init__ = _patched_init
+
 import torch
 from huggingface_hub import hf_hub_download
 from ruaccent import RUAccent
